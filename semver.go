@@ -124,6 +124,86 @@ func (v Version) String() string {
 	return b.String()
 }
 
+// Compare returns -1, 0, or 1 as v is less than, equal to, or greater
+// than other, following semver's precedence rules: core version numbers
+// compare numerically, a prerelease version has lower precedence than
+// the same version without one, and prerelease identifiers compare
+// left to right (numeric identifiers numerically, alphanumeric ones
+// ASCII-lexically, with a shorter list preceding a longer one when it
+// is otherwise a prefix). Build metadata is ignored, matching the spec.
+func Compare(v, other Version) int {
+	if c := compareUint(v.Major, other.Major); c != 0 {
+		return c
+	}
+	if c := compareUint(v.Minor, other.Minor); c != 0 {
+		return c
+	}
+	if c := compareUint(v.Patch, other.Patch); c != 0 {
+		return c
+	}
+	return comparePrerelease(v.Prerelease, other.Prerelease)
+}
+
+func compareUint(a, b uint64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// comparePrerelease implements semver.org spec item 11: a version with a
+// prerelease section always has lower precedence than one without.
+func comparePrerelease(a, b []string) int {
+	if len(a) == 0 && len(b) == 0 {
+		return 0
+	}
+	if len(a) == 0 {
+		return 1
+	}
+	if len(b) == 0 {
+		return -1
+	}
+	for i := 0; i < len(a) && i < len(b); i++ {
+		if c := compareIdentifier(a[i], b[i]); c != 0 {
+			return c
+		}
+	}
+	return compareUint(uint64(len(a)), uint64(len(b)))
+}
+
+// compareIdentifier compares a single prerelease identifier pair. Both
+// were already validated by Parse, so isDigits alone is enough to tell
+// numeric from alphanumeric here.
+func compareIdentifier(a, b string) int {
+	aIsNum, bIsNum := isDigits(a), isDigits(b)
+	if aIsNum && bIsNum {
+		an, _ := strconv.ParseUint(a, 10, 64)
+		bn, _ := strconv.ParseUint(b, 10, 64)
+		return compareUint(an, bn)
+	}
+	if aIsNum != bIsNum {
+		// Numeric identifiers always have lower precedence than
+		// alphanumeric ones (spec item 11.4.3).
+		if aIsNum {
+			return -1
+		}
+		return 1
+	}
+	return strings.Compare(a, b)
+}
+
+// Versions is a slice of Version that implements sort.Interface in
+// semver precedence order.
+type Versions []Version
+
+func (vs Versions) Len() int           { return len(vs) }
+func (vs Versions) Less(i, j int) bool { return Compare(vs[i], vs[j]) < 0 }
+func (vs Versions) Swap(i, j int)      { vs[i], vs[j] = vs[j], vs[i] }
+
 func isDigits(s string) bool {
 	if s == "" {
 		return false

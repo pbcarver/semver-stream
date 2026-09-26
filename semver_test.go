@@ -1,6 +1,7 @@
 package semver
 
 import (
+	"sort"
 	"strings"
 	"testing"
 )
@@ -49,6 +50,75 @@ func TestParseInvalid(t *testing.T) {
 	for _, in := range cases {
 		if _, err := Parse(in); err == nil {
 			t.Errorf("Parse(%q) succeeded, want error", in)
+		}
+	}
+}
+
+func TestCompare(t *testing.T) {
+	// Ascending precedence order, taken from the semver.org spec's own
+	// example plus a few extras for build metadata and equal cases.
+	ordered := []string{
+		"1.0.0-alpha",
+		"1.0.0-alpha.1",
+		"1.0.0-alpha.beta",
+		"1.0.0-beta",
+		"1.0.0-beta.2",
+		"1.0.0-beta.11",
+		"1.0.0-rc.1",
+		"1.0.0",
+		"1.0.1",
+		"1.1.0",
+		"2.0.0",
+	}
+	for i := 0; i < len(ordered); i++ {
+		vi, err := Parse(ordered[i])
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", ordered[i], err)
+		}
+		if c := Compare(vi, vi); c != 0 {
+			t.Errorf("Compare(%q, %q) = %d, want 0", ordered[i], ordered[i], c)
+		}
+		for j := i + 1; j < len(ordered); j++ {
+			vj, err := Parse(ordered[j])
+			if err != nil {
+				t.Fatalf("Parse(%q): %v", ordered[j], err)
+			}
+			if c := Compare(vi, vj); c >= 0 {
+				t.Errorf("Compare(%q, %q) = %d, want < 0", ordered[i], ordered[j], c)
+			}
+			if c := Compare(vj, vi); c <= 0 {
+				t.Errorf("Compare(%q, %q) = %d, want > 0", ordered[j], ordered[i], c)
+			}
+		}
+	}
+}
+
+func TestCompareIgnoresBuild(t *testing.T) {
+	a, _ := Parse("1.0.0+build.1")
+	b, _ := Parse("1.0.0+build.2")
+	if c := Compare(a, b); c != 0 {
+		t.Errorf("Compare with differing build metadata = %d, want 0", c)
+	}
+}
+
+func TestVersionsSort(t *testing.T) {
+	in := []string{"1.0.1", "1.0.0-rc.1", "2.0.0", "1.0.0-beta.11", "1.0.0"}
+	want := []string{"1.0.0-beta.11", "1.0.0-rc.1", "1.0.0", "1.0.1", "2.0.0"}
+
+	vs := make(Versions, len(in))
+	for i, s := range in {
+		v, err := Parse(s)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", s, err)
+		}
+		vs[i] = v
+	}
+
+	sort.Sort(vs)
+
+	for i, v := range vs {
+		if got := v.String(); got != want[i] {
+			t.Errorf("sorted[%d] = %q, want %q", i, got, want[i])
 		}
 	}
 }
