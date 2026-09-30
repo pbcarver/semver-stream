@@ -1,6 +1,7 @@
 package semver
 
 import (
+	"errors"
 	"sort"
 	"strings"
 	"testing"
@@ -50,6 +51,36 @@ func TestParseInvalid(t *testing.T) {
 	for _, in := range cases {
 		if _, err := Parse(in); err == nil {
 			t.Errorf("Parse(%q) succeeded, want error", in)
+		}
+	}
+}
+
+func TestParseLoose(t *testing.T) {
+	valid := map[string]string{
+		"1.2.3":           "1.2.3",
+		"v1.2.3":          "1.2.3",
+		"V1.2.3":          "1.2.3",
+		"v1.0.0-rc.1+b.9": "1.0.0-rc.1+b.9",
+		"v0.0.0":          "0.0.0",
+	}
+	for in, want := range valid {
+		v, err := ParseLoose(in)
+		if err != nil {
+			t.Errorf("ParseLoose(%q) returned error: %v", in, err)
+			continue
+		}
+		if got := v.String(); got != want {
+			t.Errorf("ParseLoose(%q).String() = %q, want %q", in, got, want)
+		}
+	}
+
+	invalid := []string{"", "v", "vv1.2.3", "v 1.2.3", "v1.2", "v01.2.3", " v1.2.3", "x1.2.3"}
+	for _, in := range invalid {
+		_, err := ParseLoose(in)
+		if err == nil {
+			t.Errorf("ParseLoose(%q) succeeded, want error", in)
+		} else if !errors.Is(err, ErrInvalidVersion) {
+			t.Errorf("ParseLoose(%q) error does not wrap ErrInvalidVersion: %v", in, err)
 		}
 	}
 }

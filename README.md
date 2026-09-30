@@ -70,12 +70,13 @@ parse error to stderr, and exits non-zero if anything failed to parse.
 
 This is a strict implementation of the grammar at semver.org:
 
-- No `v` prefix (`v1.2.3` is rejected; strip it yourself if your source
-  uses it).
+- `Parse` rejects a `v` prefix (`v1.2.3`). Use `ParseLoose` if your source
+  has them; it strips one leading `v` or `V` and is otherwise identical.
 - No leading zeros in numeric identifiers.
 - No whitespace, no empty identifiers.
 
-Comparison and sorting aren't implemented yet — see below.
+`Compare` and the `Versions` sort type order versions by semver precedence.
+Constraint ranges aren't implemented yet.
 
 ## Status
 

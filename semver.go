@@ -98,6 +98,17 @@ func Parse(s string) (Version, error) {
 	return v, nil
 }
 
+// ParseLoose is like Parse but accepts a single leading "v" or "V", as
+// found in most git tags. Nothing else is relaxed: "vv1.2.3", "v 1.2.3"
+// and a bare "v" are still errors. The prefix is not kept, so String on
+// the result gives the canonical form without it.
+func ParseLoose(s string) (Version, error) {
+	if s != "" && (s[0] == 'v' || s[0] == 'V') {
+		s = s[1:]
+	}
+	return Parse(s)
+}
+
 // Validate reports whether s is a well-formed semantic version, without
 // handing back the parsed value.
 func Validate(s string) error {
